@@ -143,6 +143,8 @@ def list_runs(project_id: Optional[str] = None, hum_id: Optional[str] = None) ->
         runs = [r for r in runs if r.projectId == project_id]
     if hum_id is not None:
         runs = [r for r in runs if r.humId == hum_id]
+    # sort by startedAt if available
+    runs.sort(key=lambda r: r.startedAt or "", reverse=False)
     return runs
 
 

@@ -39,7 +39,7 @@ def position_competitors(embeddings: Dict[str, List[float]]) -> Dict[str, Dict[s
     """
     Reduce embeddings to 2D via PCA. Returns {competitorId: {x, y}}.
     """
-    if not embeddings:
+    if not embeddings or len(embeddings) < 2:
         return {}
     import numpy as np
     from sklearn.decomposition import PCA
@@ -48,4 +48,3 @@ def position_competitors(embeddings: Dict[str, List[float]]) -> Dict[str, Dict[s
     mat = np.vstack([embeddings[cid] for cid in ids])
     coords = PCA(n_components=2).fit_transform(mat)
     return {cid: {"x": float(x), "y": float(y)} for cid, (x, y) in zip(ids, coords)}
-

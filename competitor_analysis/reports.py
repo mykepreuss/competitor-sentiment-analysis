@@ -21,6 +21,8 @@ except ImportError:  # pragma: no cover
     pd = None  # type: ignore
 
 from .models import CompetitorAnalysisRunRecord, CompetitorArtifactRecord
+from .stopwords import CUSTOM_STOP_WORDS
+from .gpt_reports import generate_gpt_artifacts
 
 
 def _now_iso() -> str:
@@ -432,6 +434,7 @@ def generate_all_reports(
     df: "Any",
     summary: Dict[str, Any],
     output_dir: str,
+    settings: Dict[str, Any] = None,
 ) -> List[CompetitorArtifactRecord]:
     artifacts: List[CompetitorArtifactRecord] = []
     artifacts.extend(generate_csv_and_excel(run, df, output_dir))
@@ -439,4 +442,32 @@ def generate_all_reports(
     artifacts.append(generate_keyword_distribution_plot(run, df, output_dir))
     artifacts.append(generate_sentiment_plot(run, df, output_dir))
     artifacts.append(generate_markdown_report(run, summary, df, output_dir))
+    # Optional GPT artifacts
+    gpt_artifacts = generate_gpt_artifacts(run, summary, output_dir, settings or {})
+    for a in gpt_artifacts:
+        artifacts.append(
+            CompetitorArtifactRecord(
+                id=a["id"],
+                projectId=run.projectId,
+                humId=run.humId,
+                runId=run.id,
+                scenarioId=a["scenarioId"],
+                scenarioKind="competitor_analysis",
+                routeTemplate="/competitors/report",
+                device="desktop",
+                stateSlug="summary",
+                capturedAt=_now_iso(),
+                mimeType=a["mimeType"],
+                rawKey=a["path"],
+                brandedKey=None,
+                thumbKey=None,
+                diffKey=None,
+                afterUrl=None,
+                beforeUrl=None,
+                thumbUrl=None,
+                byteSize=None,
+                width=None,
+                height=None,
+            )
+        )
     return artifacts

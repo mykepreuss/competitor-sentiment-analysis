@@ -69,6 +69,7 @@ def build_summary_from_dataframe(
     df: "pd.DataFrame",
     competitors: List[CompetitorConfig],
     settings: Dict[str, Any],
+    previous_df: "pd.DataFrame" = None,
 ) -> CompetitorAnalysisSummary:
     """
     Core v1 summary builder.
@@ -197,18 +198,57 @@ def build_summary_from_dataframe(
             summary._meta["keybertKeywords"] = []
 
     # Optional: overlap/differentiation vs your terms
+    # Overlap vs your terms (or vs competitor 'me' if present)
     your_terms = set(t.lower() for t in settings.get("your_terms", []) if t)
-    if your_terms:
-        overlap_map: Dict[str, Dict[str, float]] = {}
+    overlap_map: Dict[str, Dict[str, float]] = {}
+    my_vocab: set = set()
+    if "me" in comp_map:
+        my_df = df[df["competitorId"] == "me"]
+        for text in my_df.get("cleaned_text", pd.Series(dtype=str)).dropna().astype(str):
+            my_vocab.update([w for w in text.split() if w not in CUSTOM_STOP_WORDS])
+    elif your_terms:
+        my_vocab = your_terms
+    if my_vocab:
         for competitor_id, group in df.groupby("competitorId"):
+            if competitor_id == "me":
+                continue
             words = set()
             for text in group.get("cleaned_text", pd.Series(dtype=str)).dropna().astype(str):
                 words.update([w for w in text.split() if w not in CUSTOM_STOP_WORDS])
-            overlap = len(words & your_terms) / len(words | your_terms) if words else 0.0
+            overlap = len(words & my_vocab) / len(words | my_vocab) if words else 0.0
             overlap_map[competitor_id] = {
                 "overlap": overlap,
                 "differentiationScore": 1 - overlap,
             }
         summary._meta["overlapByCompetitor"] = overlap_map
+
+    # Trends: emerging/fading vs previous_df (if provided)
+    if previous_df is not None and "cleaned_text" in previous_df.columns:
+        trends: Dict[str, Any] = {}
+        for competitor_id, group in df.groupby("competitorId"):
+            prev_group = previous_df[previous_df.get("competitorId") == competitor_id]
+            if prev_group.empty:
+                continue
+            def top_counts(g):
+                words = []
+                for text in g.get("cleaned_text", pd.Series(dtype=str)).dropna().astype(str):
+                    words.extend([w for w in text.split() if w not in CUSTOM_STOP_WORDS])
+                return Counter(words)
+            cur_counts = top_counts(group)
+            prev_counts = top_counts(prev_group)
+            emerging = []
+            fading = []
+            for w, c in cur_counts.most_common(20):
+                if c >= 3 and cur_counts[w] > prev_counts.get(w, 0) * 1.5:
+                    emerging.append(w)
+            for w, c in prev_counts.most_common(20):
+                if prev_counts[w] >= 3 and cur_counts.get(w, 0) < prev_counts[w] * 0.5:
+                    fading.append(w)
+            trends[competitor_id] = {
+                "emergingTerms": emerging[:10],
+                "fadingTerms": fading[:10],
+                "sentimentDelta": float(group["vader_sentiment"].mean() - prev_group["vader_sentiment"].mean()),
+            }
+        summary._meta["trendsByCompetitor"] = trends
 
     return summary

@@ -99,6 +99,20 @@ def create_app() -> FastAPI:
         cards = run.summaryJson._meta.get("competitorCards", [])
         return {"competitorCards": cards}
 
+    @app.get("/internal/competitor-analysis/runs/{run_id}/landscape", response_model=Dict[str, Any], dependencies=[Depends(auth_dependency)])
+    def get_landscape(run_id: str):
+        run = engine.get_analysis_run(run_id)
+        if not run or not run.summaryJson:
+            raise HTTPException(status_code=404, detail="Run not found or summary missing")
+        meta = run.summaryJson._meta or {}
+        return {
+            "competitorCards": meta.get("competitorCards", []),
+            "positioningMap": meta.get("positioningMap", {}),
+            "overlapByCompetitor": meta.get("overlapByCompetitor", {}),
+            "trendsByCompetitor": meta.get("trendsByCompetitor", {}),
+            "summary": run.summaryJson,
+        }
+
     return app
 
 

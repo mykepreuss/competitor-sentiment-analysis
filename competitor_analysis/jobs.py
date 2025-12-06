@@ -27,11 +27,12 @@ def _now_iso() -> str:
     return datetime.utcnow().isoformat()
 
 
+# Simplified logger (avoid runId/humId placeholders for third-party logs)
 logger = logging.getLogger("competitor_analysis")
 if not logger.handlers:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s run=%(runId)s hum=%(humId)s %(message)s",
+        format="%(asctime)s %(levelname)s %(message)s",
     )
 
 
@@ -79,6 +80,16 @@ def run_analysis_job(payload: Dict[str, Any]) -> None:
     if not run:
         return
 
+    # Load previous run for trends
+    prev_df = None
+    runs_same_hum = store.list_runs(project_id=run.projectId, hum_id=run.humId)
+    prev_ids = [r.id for r in runs_same_hum if r.id != run_id]
+    if prev_ids:
+        prev_run_id = prev_ids[-1]
+        prev_results = store.load_analysis_results(prev_run_id)
+        if prev_results and pd is not None:
+            prev_df = pd.DataFrame(prev_results)
+
     start_time = _now_iso()
     try:
         page_contents = store.load_page_contents(run_id)
@@ -109,7 +120,7 @@ def run_analysis_job(payload: Dict[str, Any]) -> None:
                 df["competitorId"] = df.get("competitor_name", "unknown")
 
         competitors = config.load_competitor_configs({"competitors": competitors_raw})
-        summary_json = summary.build_summary_from_dataframe(df, competitors, settings)
+        summary_json = summary.build_summary_from_dataframe(df, competitors, settings, previous_df=prev_df)
         # record timing/meta
         meta = summary_json._meta or {}
         meta["analysisStartedAt"] = start_time
@@ -144,7 +155,7 @@ def run_report_job(payload: Dict[str, Any]) -> None:
         df = pd.DataFrame(analysis_results)
 
         summary_json = run.summaryJson
-        artifacts = reports.generate_all_reports(run, df, summary_json, output_dir)
+        artifacts = reports.generate_all_reports(run, df, summary_json, output_dir, settings=settings)
         store.save_artifacts(run_id, artifacts)
         store.update_run(
             run_id,

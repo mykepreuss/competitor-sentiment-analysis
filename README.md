@@ -52,6 +52,7 @@ Endpoints (internal prototype):
 - `GET  /internal/competitor-analysis/runs/{id}/artifacts`
 - `GET  /internal/competitor-analysis/runs/{id}/cards`
 - `GET  /internal/competitor-analysis/runs` (list by projectId/humId)
+- Minimal landscape/trends HTML (prototype): `uvicorn competitor_analysis.ui_server:app --reload` then open `/landscape/{runId}` or `/trends/{runId}` (debug views).
 
 Auth: set `COMPETITOR_API_KEY` and send header `X-API-Key`.
 
