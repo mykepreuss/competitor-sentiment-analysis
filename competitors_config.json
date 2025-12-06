@@ -1,0 +1,79 @@
+{
+  "competitors": [
+    {
+      "name": "FleetSpace",
+      "base_url": "https://www.fleetspace.com",
+      "priority_pages": [
+        "/",
+        "/about",
+        "/mineral-exploration",
+        "/resources/ai-for-explorers-leveraging-ai-tools-optimised-for-modern-mineral-exploration",
+        "/resources/application-of-ant-to-iron-oxide-copper-gold-exploration-in-chile",
+        "/resources/accelerating-copper-discovery-in-chile-with-power-nickel"
+      ]
+    },
+    {
+      "name": "MineFlow",
+      "base_url": "https://mineflow.ai",
+      "priority_pages": [
+        "/",
+        "/about",
+        "/docs",
+        "/pricing"
+      ]
+    },
+    {
+      "name": "KoBold",
+      "base_url": "https://www.koboldmetals.com",
+      "priority_pages": [
+        "/",
+        "/partnership",
+        "/news",
+        "/ethics"
+      ]
+    },
+    {
+      "name": "SensOre",
+      "base_url": "https://sensore.com",
+      "priority_pages": [
+        "/",
+        "/about",
+        "/technology",
+        "/solutions",
+        "/services",
+        "/insights"
+      ]
+    },
+    {
+      "name": "VerAI",
+      "base_url": "https://ver-ai.com",
+      "priority_pages": [
+        "/"
+      ]
+    },
+    {
+      "name": "Seequent",
+      "base_url": "https://www.seequent.com",
+      "priority_pages": [
+        "/",
+        "/products-solutions/leapfrog-geo",
+        "/products-solutions/geosoft-target",
+        "/products-solutions/seequent-central",
+        "/products-solutions/imago",
+        "/products-solutions/mining",
+        "/artificial-intelligence-to-understand-the-underground",
+        "/artificial-intelligence-has-great-potential-but-its-only-human"
+      ]
+    },{
+      "name": "Equivest Metals",
+      "base_url": "https://www.equivestmetals.com",
+      "priority_pages": [
+        "/",
+        "/Services",
+        "/blog",
+        "/post/what-could-the-next-decade-s-discoveries-look-like",
+        "/post/we-assessed-500-exploration-companies-what-are-the-5-most-important-learnings"
+      ]
+    }
+  ]
+}
