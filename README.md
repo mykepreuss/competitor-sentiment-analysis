@@ -1,128 +1,105 @@
-# Competitor Web Scraper
+# Competitor Analysis Engine (Insight-First Baseline)
 
-A robust Python-based application designed to ethically extract, analyze, and report competitive intelligence from public website data.
+This project turns competitor websites into actionable competitive intelligence. It scrapes target pages (Playwright or requests), derives dynamic technical/value terms from the content itself, computes sentiment and messaging mix, and produces artifacts (CSV/XLSX, charts, Markdown) plus a JSON summary that’s compatible with Hummingbird-style “runs” and “artifacts.”
 
-## Features
-- 🔍 Intelligent web crawling with rate limiting and respect for robots.txt
-- 📊 Advanced data parsing with BeautifulSoup4 and Selenium
-- 💾 Flexible data export (CSV, JSON, SQL, Excel)
-- ⚙️ Configurable scraping rules and patterns
-- 📈 Data cleaning and normalization
-- 🔄 Automated scheduling and monitoring
+**Key capabilities**
+- JS-capable scraping (Playwright) with polite delays/retries.
+- Dynamic term extraction (no pre-baked keyword lists): nouns → technical, adjectives/adverbs/verbs → value.
+- Per-competitor sentiment, tech/value mix, top props/keywords, cards view.
+- Artifacts: run-level CSV/XLSX (multi-sheet), per-competitor CSVs, keyword distribution chart with annotations, sentiment chart, enriched Markdown report.
+- File-backed store (`store.json`) for runs/artifacts (prototype).
 
-## Requirements
-- Python 3.8+
-- Chrome/Firefox WebDriver (for JavaScript-rendered content)
-- System Requirements:
-  - 4GB RAM minimum
-  - 2GB free disk space
-  - Internet connection
+## Quickstart (CLI)
 
-## Setup
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/competitor-web-scraper.git
-   cd competitor-web-scraper
-   ```
-
-2. Create virtual environment:
-   ```bash
-   python -m venv venv
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   
-   # On Windows
-   venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure the scraper:
-   ```bash
-   cp config.example.json config.json
-   ```
-   Update `config.json` with your settings:
-   ```json
-   {
-     "targets": {
-       "example.com": {
-         "frequency": "daily",
-         "pages": ["/products", "/pricing"],
-         "selectors": {
-           "price": ".price-tag",
-           "title": "h1.product-title"
-         }
-       }
-     },
-     "output_format": "csv",
-     "proxy_settings": {
-       "enabled": false,
-       "rotate": true
-     }
-   }
-   ```
-
-## Usage
-
-1. Run the scraper:
-   ```bash
-   python scraper.py --config config.json
-   ```
-
-2. Monitor progress:
-   ```bash
-   tail -f logs/scraper.log
-   ```
-
-3. View results:
-   ```bash
-   ls -l output/
-   ```
-
-## Project Structure
-```
-competitor-web-scraper/
-├── scraper/
-│   ├── core/          # Core scraping logic
-│   ├── parsers/       # Data parsing modules
-│   ├── exporters/     # Output formatting
-│   └── utils/         # Helper functions
-├── config/           # Configuration files
-├── output/          # Scraped data output
-├── logs/            # Application logs
-└── tests/           # Test suite
+1) Install deps & browsers (one time):
+```bash
+python3 -m pip install -r requirements.txt
+python3 -m playwright install chromium
 ```
 
-## Error Handling
-- Rate limiting: Automatic backoff when rate limits detected
-- Network issues: Retry mechanism with exponential backoff
-- Invalid data: Logging and graceful degradation
+2) Set env (Playwright backend by default via `.env`):
+```bash
+export PATH="$HOME/Library/Python/3.9/bin:$PATH"
+export PYTHONPATH=.
+mkdir -p "$HOME/tmp"
+export TMPDIR="$HOME/tmp"
+export MPLCONFIGDIR="$HOME/tmp"
+```
 
-## Best Practices
-- Always check website's Terms of Service
-- Implement appropriate delays between requests
-- Use proxy rotation for high-volume scraping
-- Regular maintenance of parsing rules
+3) Run:
+```bash
+python -m competitor_analysis.cli \
+  --project ws1 \
+  --hum hum1 \
+  --name demo-run \
+  --base https://openai.com \
+  --competitors competitors_config.json \
+  --output competitor_content
+```
+
+Outputs: `competitor_content/{runId}/` (CSV, XLSX with sheets, per-competitor CSVs, keyword/sentiment PNGs, Markdown report) and run record in `competitor_content/store.json`.
+
+## API (FastAPI)
+
+Start server:
+```bash
+uvicorn competitor_analysis.api:app --reload
+```
+
+Endpoints (internal prototype):
+- `POST /internal/competitor-analysis/runs` (body: projectId, humId, seriesBaseUrl, competitors[], settings, sync?)
+- `GET  /internal/competitor-analysis/runs/{id}`
+- `GET  /internal/competitor-analysis/runs/{id}/artifacts`
+- `GET  /internal/competitor-analysis/runs/{id}/cards`
+- `GET  /internal/competitor-analysis/runs` (list by projectId/humId)
+
+Auth: set `COMPETITOR_API_KEY` and send header `X-API-Key`.
+
+## Configuration
+
+Environment (see `.env`):
+- `COMPETITOR_SCRAPER_BACKEND=playwright` (default) | requests
+- `COMPETITOR_OUTPUT_DIR` (default `competitor_content`)
+- `COMPETITOR_STORE_PATH` (default `competitor_content/store.json`)
+- `COMPETITOR_SCRAPER_TIMEOUT`, `COMPETITOR_SCRAPER_RETRIES`, `COMPETITOR_SCRAPER_DELAY`, `COMPETITOR_SCRAPER_MAX_PAGES`, `COMPETITOR_SCRAPER_MAX_ELEMENTS`
+- `COMPETITOR_USER_AGENT`
+- Optional: embeddings/KeyBERT (`COMPETITOR_USE_EMBEDDINGS`, `COMPETITOR_USE_KEYBERT`, models)
+- `COMPETITOR_YOUR_TERMS` (comma-separated) to compute overlap/differentiation vs your own messaging
+
+Competitor config (`competitors_config.json`):
+```json
+{
+  "competitors": [
+    {"id": "me", "name": "OpenAI", "baseUrl": "https://openai.com", "priorityPages": ["/", "/agent-platform", "/business"]},
+    {"id": "rival1", "name": "Claude", "baseUrl": "https://claude.com", "priorityPages": ["/", "/solutions/coding", "/solutions/agents", "/platform/api"]},
+    {"id": "rival2", "name": "Google", "baseUrl": "https://gemini.google", "priorityPages": ["/", "/about", "/overview/deep-research", "/overview/video-generation", "/overview/image-generation"]}
+  ]
+}
+```
+
+## How it works (pipeline)
+1. Scrape pages (Playwright or requests+BS4); extract h1/h2/h3/p.
+2. Dynamic term extraction from corpus (POS-tagged nouns → technical, adjectives/adverbs/verbs → value).
+3. Per-chunk sentiment (VADER) + keyword counts + intent classification; add cleaned_text.
+4. Aggregate to summaryJson:
+   - sentiment buckets, tech/value totals, top props/keywords, competitor cards (sentiment category, tech/value mix, top technical concepts), optional positioning/overlap when enabled.
+5. Export artifacts: CSV/XLSX (Raw, Summary, Intent, Sentiment, Top Keywords), per-competitor CSVs, keyword distribution PNG (annotated), sentiment PNG, Markdown report (with intent mix, sentiment, tech/value mix, overlap info).
+
+## Logs & Store
+- Prototype persistence: JSON file at `COMPETITOR_STORE_PATH`.
+- Outputs: `COMPETITOR_OUTPUT_DIR/{runId}/...`.
+
+## Known considerations
+- Playwright is recommended for JS-heavy sites; requests may miss content.
+- Some sites block scraping; consider adding proxies/headers or ignoring robots (not enabled by default).
+- LibreSSL warning from urllib3 can be ignored for scraping.
 
 ## Development
+- Tests: `PYTHONPATH=. TMPDIR=$HOME/tmp MPLCONFIGDIR=$HOME/tmp pytest tests -q --cache-clear`
+- Requirements: see `requirements.txt` (Playwright, pandas, matplotlib, nltk, sentence-transformers, keybert, scikit-learn, fastapi/uvicorn).
 
-```bash
-# Run tests
-python -m pytest
-
-# Check code style
-flake8 .
-
-# Generate documentation
-sphinx-build docs/ docs/_build
-```
-
-## Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Run tests and lint checks
-4. Submit a pull request
+## Roadmap (insight-first)
+- Positioning map and overlap/differentiation surfaced in UI.
+- Trends (emerging/fading themes over time).
+- GPT-generated executive summary and differentiation recommendations as artifacts.
+- Optional embeddings/KeyBERT already wired; enable via env to experiment.
